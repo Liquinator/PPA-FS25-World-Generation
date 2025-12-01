@@ -50,19 +50,20 @@ inline std::vector<glm::vec2> place_trees_seq(
       treeLocation.push_back(glm::vec2(x, y));
     }
   }
+  return treeLocation;
 }
 
 inline std::vector<glm::vec2> place_trees_par(
     const std::vector<std::vector<double>>& heightmap,
     const TreePlacementConfig& treeConfig = TreePlacementConfig{},
     const HeightmapConfig& moistureMapConfig = HeightmapConfig{}) {
-  PerlinNoisePar* perlinNoise;
+  PerlinNoisePar* perlinNoise = nullptr;
   std::vector<glm::vec2> treeLocation;
   int dimension = heightmap.size();
   parlay::sequence<double> moisture_map(dimension * dimension);
   glm::vec2 dim = glm::vec2(dimension, dimension);
 
-  auto indecies = parlay::iota(dimension * dimension);
+  // auto indecies = parlay::iota(dimension * dimension);
   moisture_map = perlinNoise->generate_heightmap(
       moistureMapConfig.octaves, moistureMapConfig.frequency,
       glm::vec2(dimension, dimension));
@@ -86,6 +87,8 @@ inline std::vector<glm::vec2> place_trees_par(
     }
     return treeLocation;
   });
+
+  return treeLocation;
 }
 
 inline std::vector<glm::vec2> place_trees(

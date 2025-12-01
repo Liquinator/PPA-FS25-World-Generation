@@ -124,7 +124,6 @@ class PerlinNoisePar : public PerlinNoise {
   inline parlay::sequence<double> generate_heightmap(int32_t octaves,
                                                      double frequency,
                                                      glm::vec2 dim) {
-    float min, max = 0.0;
     auto results = parlay::tabulate((int)dim.x * (int)dim.y, [&](size_t idx) {
       int x = idx / (int)dim.y;
       int y = idx % (int)dim.y;

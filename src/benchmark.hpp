@@ -50,7 +50,7 @@ inline std::vector<glm::vec2> benchmark_tree_generation(
     const bool use_parallel, const CMDSettings& settings,
     const TreePlacementConfig& treeConfig = TreePlacementConfig{},
     const HeightmapConfig& heightmapConfig = HeightmapConfig{}) {
-  PerlinNoisePar* perlinNoise;
+  PerlinNoisePar* perlinNoise = nullptr;
   std::vector<std::vector<double>> heightmap;
   heightmap.assign(settings.dimension,
                    std::vector<double>(settings.dimension, 0.0));
