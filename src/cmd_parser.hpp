@@ -13,7 +13,6 @@ enum class GenerationMode { SEQUENTIAL, PARALLEL, BOTH };
 struct CMDSettings {
   int seed{42};
   int dimension{256};
-  bool perlin_only{false};
   GenerationMode mode{GenerationMode::BOTH};
 };
 
@@ -23,11 +22,7 @@ typedef std::function<void(CMDSettings&, const std::string&)> OneArgHandle;
 const std::unordered_map<std::string, NoArgHandle> NoArgs{
     {"-p", [](CMDSettings& s) { s.mode = GenerationMode::PARALLEL; }},
     {"-s", [](CMDSettings& s) { s.mode = GenerationMode::SEQUENTIAL; }},
-    {"-full",
-     [](CMDSettings& s) {
-       s.mode = GenerationMode::BOTH;
-       s.perlin_only = true;
-     }},
+    {"-full", [](CMDSettings& s) { s.mode = GenerationMode::BOTH; }},
 };
 
 const std::unordered_map<std::string, OneArgHandle> OneArg{
