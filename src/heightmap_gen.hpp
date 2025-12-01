@@ -12,8 +12,8 @@ struct HeightmapConfig {
   double scale = 60;
 };
 
-PerlinNoise* get_perlin_noise_generator(const bool use_parallel,
-                                        const unsigned int seed) {
+inline PerlinNoise* get_perlin_noise_generator(const bool use_parallel,
+                                               const unsigned int seed) {
   if (use_parallel) {
     return new PerlinNoisePar(seed);
   } else {

@@ -57,7 +57,9 @@ inline std::vector<glm::vec2> place_trees_par(
     const std::vector<std::vector<double>>& heightmap,
     const TreePlacementConfig& treeConfig = TreePlacementConfig{},
     const HeightmapConfig& moistureMapConfig = HeightmapConfig{}) {
-  PerlinNoisePar* perlinNoise = nullptr;
+  PerlinNoise* perlinNoise =
+      get_perlin_noise_generator(true, moistureMapConfig.seed);
+
   std::vector<glm::vec2> treeLocation;
   int dimension = heightmap.size();
   parlay::sequence<double> moisture_map(dimension * dimension);
@@ -71,11 +73,14 @@ inline std::vector<glm::vec2> place_trees_par(
   auto minmax = parlay::minmax_element(moisture_map);
   double min_val = *minmax.first;
   double max_val = *minmax.second;
+  double range = max_val - min_val;
 
   auto treeRows = parlay::map(parlay::iota(dimension), [&](int x) {
+    std::vector<glm::vec2> localTrees;
+
     for (int y = 0; y < dimension; y++) {
       double raw_value = moisture_map[x * dimension + y];
-      double normalized_value = (raw_value - min_val) / max_val;
+      double normalized_value = (raw_value - min_val) / range;
 
       if (normalized_value < treeConfig.treeDensity) continue;
       if (heightmap[x][y] > treeConfig.treeLine) continue;
@@ -83,11 +88,13 @@ inline std::vector<glm::vec2> place_trees_par(
       if (glm::dot(surface_norm, glm::vec3(0.0, 0.0, 1.0)) <
           treeConfig.maxSlope)
         continue;
-      treeLocation.push_back(glm::vec2(x, y));
+      localTrees.push_back(glm::vec2(x, y));
     }
-    return treeLocation;
+    return localTrees;
   });
 
+  auto flattened = parlay::flatten(treeRows);
+  treeLocation.assign(flattened.begin(), flattened.end());
   return treeLocation;
 }
 

@@ -47,10 +47,11 @@ void warmup() {
 }
 
 inline std::vector<glm::vec2> benchmark_tree_generation(
-    const bool use_parallel, const CMDSettings& settings,
+    const bool use_parallel, CMDSettings& settings,
     const TreePlacementConfig& treeConfig = TreePlacementConfig{},
     const HeightmapConfig& heightmapConfig = HeightmapConfig{}) {
-  PerlinNoisePar* perlinNoise = nullptr;
+  PerlinNoise* perlinNoise =
+      get_perlin_noise_generator(false, heightmapConfig.seed);
   std::vector<std::vector<double>> heightmap;
   heightmap.assign(settings.dimension,
                    std::vector<double>(settings.dimension, 0.0));
