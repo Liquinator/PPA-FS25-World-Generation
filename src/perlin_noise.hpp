@@ -23,6 +23,10 @@ class PerlinNoise {
       int32_t octaves, double frequency, glm::vec2 dim,
       std::vector<std::vector<double>>& heightmap) = 0;
 
+  virtual parlay::sequence<double> generate_heightmap(int32_t octaves,
+                                                      double frequency,
+                                                      glm::vec2 dim) = 0;
+
  protected:
   std::vector<int> permutation;
   double fade(const double t) const noexcept {
@@ -43,6 +47,10 @@ class PerlinNoise {
 class PerlinNoiseSeq : public PerlinNoise {
  public:
   PerlinNoiseSeq(const unsigned int seed) : PerlinNoise(seed) {}
+
+  parlay::sequence<double> generate_heightmap(
+      [[maybe_unused]] int32_t octaves, [[maybe_unused]] double frequency,
+      [[maybe_unused]] glm::vec2 dim) override {};
 
   inline virtual std::vector<std::vector<double>> generate_normalized_heightmap(
       int32_t octaves, double frequency, glm::vec2 dim,
@@ -123,7 +131,7 @@ class PerlinNoisePar : public PerlinNoise {
 
   inline parlay::sequence<double> generate_heightmap(int32_t octaves,
                                                      double frequency,
-                                                     glm::vec2 dim) {
+                                                     glm::vec2 dim) override {
     auto results = parlay::tabulate((int)dim.x * (int)dim.y, [&](size_t idx) {
       int x = idx / (int)dim.y;
       int y = idx % (int)dim.y;
