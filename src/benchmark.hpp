@@ -60,6 +60,25 @@ inline std::vector<glm::vec2> benchmark_tree_generation(
       heightmapConfig.octaves, heightmapConfig.frequency,
       glm::vec2(settings.dimension, settings.dimension), heightmap);
 
+  if (use_parallel)
+    std::cout << "Starting parallel tree placement benchmark" << std::endl;
+  if (!use_parallel)
+    std::cout << "Starting sequential tree placement benchmark" << std::endl;
+
+  std::vector<std::chrono::duration<double>> times;
+  for (int r = 0; r < BENCHMARK_QUANTITY; ++r) {
+    auto start = std::chrono::high_resolution_clock::now();
+    place_trees(heightmap, use_parallel, treeConfig, heightmapConfig);
+
+    auto stop = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = stop - start;
+    std::cout << "Time " << diff.count() << std::endl;
+    times.push_back(diff);
+  }
+
+  std::chrono::duration<double> total_time = std::accumulate(
+      times.begin(), times.end(), std::chrono::duration<double>(0.0));
+  std::cout << "average " << (total_time / times.size()).count() << std::endl;
   std::vector<glm::vec2> tree_placement =
       place_trees(heightmap, use_parallel, treeConfig, heightmapConfig);
 
@@ -69,6 +88,12 @@ inline std::vector<glm::vec2> benchmark_tree_generation(
 inline std::vector<std::vector<double>> benchmark_heightmap(
     const bool use_parallel, CMDSettings& settings,
     const HeightmapConfig& heightmap_config = HeightmapConfig{}) {
+  if (use_parallel)
+    std::cout << "Starting parallel heightmap generation benchmark"
+              << std::endl;
+  if (!use_parallel)
+    std::cout << "Starting sequential heightmap generation benchmark"
+              << std::endl;
   std::vector<std::chrono::duration<double>> times;
   for (int r = 0; r < BENCHMARK_QUANTITY; ++r) {
     auto start = std::chrono::high_resolution_clock::now();
