@@ -63,11 +63,10 @@ inline std::vector<glm::vec2> place_trees_par(
   std::vector<glm::vec2> treeLocation;
   int dimension = heightmap.size();
   parlay::sequence<double> moisture_map(dimension * dimension);
-  glm::vec2 dim = glm::vec2(dimension, dimension);
 
-  // auto indecies = parlay::iota(dimension * dimension);
+  double adjusted_frequency = moistureMapConfig.frequency * (dimension / 256);
   moisture_map = perlinNoise->generate_heightmap(
-      moistureMapConfig.octaves, moistureMapConfig.frequency,
+      moistureMapConfig.octaves, adjusted_frequency,
       glm::vec2(dimension, dimension));
 
   auto minmax = parlay::minmax_element(moisture_map);
