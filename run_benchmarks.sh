@@ -4,7 +4,7 @@ output_file="benchmark_results.csv"
 echo "dimension,seed,threads,heightmap_avg_time,tree_avg_time" > "$output_file"
 
 # Dimensions to test
-dims=(64 256 512 1024)
+dims=(32 64 256 512 1024 2048)
 
 # Thread counts to test
 threads=(1 2 4 8 16 32 64)
@@ -21,6 +21,10 @@ for dim in "${dims[@]}"; do
         output=$(./build/benchmark_world_gen -dim "$dim" -seed "$seed" -s 2>&1)
       else
         output=$(PARLAY_NUM_THREADS="$thread" ./build/benchmark_world_gen -dim "$dim" -seed "$seed" -p 2>&1)
+        if echo "$output" | grep -q "FAIL"; then
+          echo "Correctness check failed for dim=$dim, seed=$seed, threads=$thread"
+          exit 1
+        fi
       fi
       heightmap_avg=$(echo "$output" | grep "average" | head -1 | awk '{print $2}')
       tree_avg=$(echo "$output" | grep "average" | tail -1 | awk '{print $2}')

@@ -143,9 +143,28 @@ void benchmark(CMDSettings& settings) {
     }
 
     case GenerationMode::PARALLEL: {
-      benchmark_heightmap(true, settings, HeightmapConfig{});
-      benchmark_tree_generation(true, settings, TreePlacementConfig{},
-                                HeightmapConfig{});
+      auto par_res_height =
+          benchmark_heightmap(true, settings, HeightmapConfig{});
+      auto par_res_tree = benchmark_tree_generation(
+          true, settings, TreePlacementConfig{}, HeightmapConfig{});
+
+      auto seq_res_height =
+          benchmark_heightmap(false, settings, HeightmapConfig{});
+      auto seq_res_tree = benchmark_tree_generation(
+          false, settings, TreePlacementConfig{}, HeightmapConfig{});
+
+      if (test_correctness(seq_res_height, par_res_height)) {
+        std::cout << "SUCCESS" << std::endl;
+      } else {
+        std::cout << "FAIL" << std::endl;
+      }
+
+      if (compare_tree_locations(seq_res_tree, par_res_tree)) {
+        std::cout << "SUCCESS" << std::endl;
+      } else {
+        std::cout << "FAIL" << std::endl;
+      }
+
       break;
     }
     case GenerationMode::SEQUENTIAL: {
