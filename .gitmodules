@@ -1,3 +1,6 @@
 [submodule "include/moderngpu"]
 	path = include/moderngpu
 	url = git@github.com:moderngpu/moderngpu.git
+[submodule "include/parlay"]
+	path = include/parlay
+	url = git@github.com:cmuparlay/parlaylib.git
