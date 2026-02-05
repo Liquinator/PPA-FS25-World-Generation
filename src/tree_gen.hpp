@@ -52,7 +52,7 @@ inline std::vector<glm::vec2> place_trees_seq(
   }
   return treeLocation;
 }
-
+/*
 inline std::vector<glm::vec2> place_trees_par(
     const std::vector<std::vector<double>>& heightmap,
     const TreePlacementConfig& treeConfig = TreePlacementConfig{},
@@ -112,3 +112,4 @@ inline std::vector<glm::vec2> place_trees(
     return place_trees_seq(heightmap, moisture_map, treeConfig);
   }
 }
+  */
