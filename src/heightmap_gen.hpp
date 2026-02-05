@@ -6,51 +6,59 @@
 #include "perlin_noise.hpp"
 
 struct HeightmapConfig {
+  int width;
+  int height;
   int octaves = 20;
   double frequency = 2.0;
   unsigned int seed = 42;
   double scale = 60;
 };
 
-inline PerlinNoise* get_perlin_noise_generator(const bool use_parallel,
-                                               const unsigned int seed) {
-  if (use_parallel) {
-    return new PerlinNoisePar(seed);
-  } else {
-    return new PerlinNoiseSeq(seed);
+class MapGenerator {
+ public:
+  HeightMap generate_heightmap_seq(const PerlinNoise& noise,
+                                   const HeightmapConfig& config) {
+    HeightMap heightmap(config.width, config.height);
+    for (int x = 0; x < config.width; x++) {
+      for (int y = 0; y < config.height; y++) {
+        float nx = x * (config.frequency / config.width);
+        float ny = y * (config.frequency / config.height);
+        heightmap.at(x, y) = noise.octaveNoise(nx, ny, config.octaves);
+      }
+    }
+    normalize(heightmap);
+    return heightmap;
   }
-}
 
-inline std::vector<std::vector<double>> generate_heightmap_seq(
-    int dimensions, const HeightmapConfig& config = HeightmapConfig{}) {
-  std::vector<std::vector<double>> heightmap(
-      dimensions, std::vector<double>(dimensions, 0.0));
+  HeightMap generate_heightmap_par(const PerlinNoise& noise,
+                                   const HeightmapConfig& config) {
+    HeightMap heightmap(config.width, config.height);
+    parlay::parallel_for(0, config.width * config.height, [&](size_t i) {
+      int x = i % config.width;
+      int y = i / config.width;
 
-  PerlinNoiseSeq PerlinNoise(config.seed);
-  double adjusted_frequency = config.frequency * (dimensions / 256);
-  return PerlinNoise.generate_normalized_heightmap(
-      config.octaves, adjusted_frequency, glm::vec2(dimensions, dimensions),
-      heightmap);
-}
+      float nx = x * (config.frequency / config.width);
+      float ny = y * (config.frequency / config.height);
 
-inline std::vector<std::vector<double>> generate_heightmap_par(
-    int dimensions, const HeightmapConfig& config = HeightmapConfig{}) {
-  std::vector<std::vector<double>> heightmap(
-      dimensions, std::vector<double>(dimensions, 0.0));
-
-  PerlinNoisePar PerlinNoise(config.seed);
-  double adjusted_frequency = config.frequency * (dimensions / 256);
-  return PerlinNoise.generate_normalized_heightmap(
-      config.octaves, adjusted_frequency, glm::vec2(dimensions, dimensions),
-      heightmap);
-}
-
-inline std::vector<std::vector<double>> generate_heightmap(
-    int dimensions, bool use_parallel = false,
-    const HeightmapConfig& config = HeightmapConfig{}) {
-  if (use_parallel) {
-    return generate_heightmap_par(dimensions, config);
-  } else {
-    return generate_heightmap_seq(dimensions, config);
+      heightmap.data[i] = noise.octaveNoise(nx, ny, config.octaves);
+    });
+    normalize(heightmap);
+    return heightmap;
   }
-}
+
+ private:
+  // TODO Include sequential normalization
+  void normalize(HeightMap& heightmap) {
+    auto minmax =
+        std::minmax_element(heightmap.data.begin(), heightmap.data.end());
+    float min_val = *minmax.first;
+    float max_val = *minmax.second;
+    float range = max_val - min_val;
+
+    if (range <= 0.00001) return;
+
+    parlay::parallel_for(0, heightmap.data.size(), [&](size_t i) {
+      heightmap.data[i] = (heightmap.data[i] - min_val) / range;
+    });
+  }
+};
