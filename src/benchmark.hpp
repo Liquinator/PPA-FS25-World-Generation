@@ -6,6 +6,7 @@
 
 #include "cmd_parser.hpp"
 #include "heightmap_gen.hpp"
+#include "perlin_noise_cuda.hpp"
 #include "tree_gen.hpp"
 
 double WARMUP_TIME_THRESHOLD = 3.0;
@@ -46,6 +47,44 @@ void warmup() {
   }
 }
 
+template <typename F>
+inline HeightMap benchmark_heightmap(const std::string& label, F&& generate) {
+  std::cout << "Starting" << label << "heightmap generation benchmark"
+            << std::endl;
+  std::vector<std::chrono::duration<double>> times;
+
+  for (int r = 0; r < BENCHMARK_QUANTITY; ++r) {
+    auto start = std::chrono::high_resolution_clock::now();
+    generate();
+
+    auto stop = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = stop - start;
+    std::cout << "Time " << diff.count() << std::endl;
+    times.push_back(diff);
+  }
+
+  std::chrono::duration<double> total_time = std::accumulate(
+      times.begin(), times.end(), std::chrono::duration<double>(0.0));
+  std::cout << "average " << (total_time / times.size()).count() << std::endl;
+  return generate();
+}
+
+inline HeightMap benchmark_heightmap_seq(MapGenerator& mapGenerator,
+                                         const PerlinNoise& perlinNoise,
+                                         const HeightmapConfig& config) {
+  return benchmark_heightmap("sequential", [&] {
+    return mapGenerator.generate_heightmap_seq(perlinNoise, config);
+  });
+}
+
+inline HeightMap benchmark_heightmap_par(MapGenerator& mapGenerator,
+                                         const PerlinNoise& perlinNoise,
+                                         const HeightmapConfig& config) {
+  return benchmark_heightmap("parallel", [&] {
+    return mapGenerator.generate_heightmap_par(perlinNoise, config);
+  });
+}
+/*
 inline std::vector<glm::vec2> benchmark_tree_generation(
     const bool use_parallel, CMDSettings& settings,
     const TreePlacementConfig& treeConfig = TreePlacementConfig{},
@@ -84,96 +123,21 @@ inline std::vector<glm::vec2> benchmark_tree_generation(
 
   return tree_placement;
 };
-
-inline std::vector<std::vector<double>> benchmark_heightmap(
-    const bool use_parallel, CMDSettings& settings,
-    const HeightmapConfig& heightmap_config = HeightmapConfig{}) {
-  if (use_parallel)
-    std::cout << "Starting parallel heightmap generation benchmark"
-              << std::endl;
-  if (!use_parallel)
-    std::cout << "Starting sequential heightmap generation benchmark"
-              << std::endl;
-  std::vector<std::chrono::duration<double>> times;
-  for (int r = 0; r < BENCHMARK_QUANTITY; ++r) {
-    auto start = std::chrono::high_resolution_clock::now();
-    generate_heightmap(settings.dimension, use_parallel, heightmap_config);
-
-    auto stop = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> diff = stop - start;
-    std::cout << "Time " << diff.count() << std::endl;
-    times.push_back(diff);
-  }
-
-  std::chrono::duration<double> total_time = std::accumulate(
-      times.begin(), times.end(), std::chrono::duration<double>(0.0));
-  std::cout << "average " << (total_time / times.size()).count() << std::endl;
-  return generate_heightmap(settings.dimension, use_parallel, heightmap_config);
-}
-
+*/
 void benchmark(CMDSettings& settings) {
+  PerlinNoise perlinNoise(settings.seed);
+  HeightmapConfig config{settings.dimension, settings.dimension};
+  MapGenerator mapGenerator;
+
   switch (settings.mode) {
-    case GenerationMode::BOTH: {
+    case GenerationMode::SEQUENTIAL: {
       auto seq_res_height =
-          benchmark_heightmap(false, settings, HeightmapConfig{});
-      auto par_res_height =
-          benchmark_heightmap(true, settings, HeightmapConfig{});
-
-      auto seq_res_tree = benchmark_tree_generation(
-          false, settings, TreePlacementConfig{}, HeightmapConfig{});
-      auto par_res_tree = benchmark_tree_generation(
-          true, settings, TreePlacementConfig{}, HeightmapConfig{});
-
-      if (test_correctness(seq_res_height, par_res_height)) {
-        std::cout << "Sequential and parallel heightmap versions are equal!"
-                  << std::endl;
-      } else {
-        std::cout << "Sequential and parallel heightmap versions are NOT equal!"
-                  << std::endl;
-      }
-
-      if (compare_tree_locations(seq_res_tree, par_res_tree)) {
-        std::cout << "Sequential and parallel tree loactions are equal!"
-                  << std::endl;
-      } else {
-        std::cout << "Sequential and parallel tree loactions are NOT equal!"
-                  << std::endl;
-      }
-      break;
+          benchmark_heightmap_seq(mapGenerator, perlinNoise, config);
     }
-
     case GenerationMode::PARALLEL: {
       auto par_res_height =
-          benchmark_heightmap(true, settings, HeightmapConfig{});
-      auto par_res_tree = benchmark_tree_generation(
-          true, settings, TreePlacementConfig{}, HeightmapConfig{});
-
-      auto seq_res_height =
-          benchmark_heightmap(false, settings, HeightmapConfig{});
-      auto seq_res_tree = benchmark_tree_generation(
-          false, settings, TreePlacementConfig{}, HeightmapConfig{});
-
-      if (test_correctness(seq_res_height, par_res_height)) {
-        std::cout << "SUCCESS" << std::endl;
-      } else {
-        std::cout << "FAIL" << std::endl;
-      }
-
-      if (compare_tree_locations(seq_res_tree, par_res_tree)) {
-        std::cout << "SUCCESS" << std::endl;
-      } else {
-        std::cout << "FAIL" << std::endl;
-      }
-
-      break;
+          benchmark_heightmap_par(mapGenerator, perlinNoise, config);
     }
-    case GenerationMode::SEQUENTIAL: {
-      benchmark_heightmap(false, settings, HeightmapConfig{});
-      benchmark_tree_generation(false, settings, TreePlacementConfig{},
-                                HeightmapConfig{});
-      break;
-    }
-
     default:
       break;
   }
