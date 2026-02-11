@@ -85,8 +85,8 @@ struct PerlinFunctor {
   }
 
   __device__ float operator()(const size_t idx) const {
-    int x_idx = idx / height;
-    int y_idx = idx % width;
+    int x_idx = idx % height;
+    int y_idx = idx / width;
 
     float x = x_idx * freq_x;
     float y = y_idx * freq_y;
@@ -154,7 +154,7 @@ PerlinNoiseCuda::~PerlinNoiseCuda() = default;
 
   std::vector<float> PerlinNoiseCuda::generate_normalized_heightmap(int32_t octaves,
                                                    float frequency,
-                                                   glm::vec2 dim) {
+                                                   glm::vec2 dim) const {
     thrust::device_vector<float> device_results =
         generate_heightmap(impl->device_permutation, octaves, frequency, dim);
     auto result =

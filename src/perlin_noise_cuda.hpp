@@ -11,7 +11,7 @@ class PerlinNoiseCuda {
   ~PerlinNoiseCuda();
 
   std::vector<float> generate_normalized_heightmap(int32_t octaves,
-                                                   float frequency, glm::vec2);
+                                                   float frequency, glm::vec2) const;
 
 private:
   struct Impl;

@@ -12,18 +12,23 @@
 double WARMUP_TIME_THRESHOLD = 3.0;
 int BENCHMARK_QUANTITY = 10;
 
-bool test_correctness(const std::vector<std::vector<double>>& a,
-                      const std::vector<std::vector<double>>& b,
-                      double delta = 1e-7) {
-  if (a.size() != b.size()) return false;
+bool test_correctness(const HeightMap& ref, const HeightMap& candidate,
+                      float delta = 1e-4) {
+  if (ref.data.size() != candidate.data.size()) {
+    std::cerr << "Size mismatch: Rows " << ref.data.size() << " vs "
+              << candidate.data.size() << std::endl;
+    return false;
+  }
 
-  for (size_t i = 0; i < a.size(); i++) {
-    if (a[i].size() != b[i].size()) return false;
+  const size_t n = ref.data.size();
 
-    for (size_t j = 0; j < a[i].size(); j++) {
-      if (std::abs(a[i][j] - b[i][j]) > delta) return false;
+  for (size_t i = 0; i < n; ++i) {
+    if (std::fabs(ref.data[i] - candidate.data[i]) > delta) {
+      std::cout << "FAILED" << std::endl;
+      return false;
     }
   }
+  std::cout << "PASSED" << std::endl;
   return true;
 }
 
@@ -49,7 +54,7 @@ void warmup() {
 
 template <typename F>
 inline HeightMap benchmark_heightmap(const std::string& label, F&& generate) {
-  std::cout << "Starting" << label << "heightmap generation benchmark"
+  std::cout << "Starting " << label << " heightmap generation benchmark"
             << std::endl;
   std::vector<std::chrono::duration<double>> times;
 
@@ -82,6 +87,14 @@ inline HeightMap benchmark_heightmap_par(MapGenerator& mapGenerator,
                                          const HeightmapConfig& config) {
   return benchmark_heightmap("parallel", [&] {
     return mapGenerator.generate_heightmap_par(perlinNoise, config);
+  });
+}
+
+inline HeightMap benchmark_heightmap_cuda(MapGenerator& mapGenerator,
+                                          const PerlinNoiseCuda& perlinNoise,
+                                          const HeightmapConfig& config) {
+  return benchmark_heightmap("cuda", [&] {
+    return mapGenerator.generate_heightmap_cuda(perlinNoise, config);
   });
 }
 /*
@@ -129,6 +142,11 @@ void benchmark(CMDSettings& settings) {
   HeightmapConfig config{settings.dimension, settings.dimension};
   MapGenerator mapGenerator;
 
+  std::cout << "[Verification] Generating Sequential Reference" << std::endl;
+  HeightMap referenceResult =
+      mapGenerator.generate_heightmap_seq(perlinNoise, config);
+  std::cout << "[Verification] Reference generated" << std::endl;
+
   switch (settings.mode) {
     case GenerationMode::SEQUENTIAL: {
       auto seq_res_height =
@@ -137,6 +155,13 @@ void benchmark(CMDSettings& settings) {
     case GenerationMode::PARALLEL: {
       auto par_res_height =
           benchmark_heightmap_par(mapGenerator, perlinNoise, config);
+      test_correctness(referenceResult, par_res_height);
+    }
+    case GenerationMode::CUDA: {
+      PerlinNoiseCuda perlinNoise(settings.seed);
+      auto cuda_res_height =
+          benchmark_heightmap_cuda(mapGenerator, perlinNoise, config);
+      test_correctness(referenceResult, cuda_res_height);
     }
     default:
       break;

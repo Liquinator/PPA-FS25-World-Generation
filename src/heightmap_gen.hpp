@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "perlin_noise.hpp"
+#include "perlin_noise_cuda.hpp"
 
 struct HeightmapConfig {
   int width;
@@ -43,6 +44,15 @@ class MapGenerator {
       heightmap.data[i] = noise.octaveNoise(nx, ny, config.octaves);
     });
     normalize(heightmap);
+    return heightmap;
+  }
+
+  HeightMap generate_heightmap_cuda(const PerlinNoiseCuda& noise,
+                                    const HeightmapConfig& config) {
+    HeightMap heightmap(config.width, config.height);
+    heightmap.data = noise.generate_normalized_heightmap(
+        config.octaves, config.frequency,
+        glm::vec2(config.width, config.height));
     return heightmap;
   }
 

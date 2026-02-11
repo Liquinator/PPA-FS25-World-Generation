@@ -23,6 +23,7 @@ typedef std::function<void(CMDSettings&, const std::string&)> OneArgHandle;
 const std::unordered_map<std::string, NoArgHandle> NoArgs{
     {"-p", [](CMDSettings& s) { s.mode = GenerationMode::PARALLEL; }},
     {"-s", [](CMDSettings& s) { s.mode = GenerationMode::SEQUENTIAL; }},
+    {"-c", [](CMDSettings& s) { s.mode = GenerationMode::CUDA; }},
     {"-gen_tree", [](CMDSettings& s) { s.gen_tree = true; }},
 };
 
