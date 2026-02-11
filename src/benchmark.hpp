@@ -151,17 +151,20 @@ void benchmark(CMDSettings& settings) {
     case GenerationMode::SEQUENTIAL: {
       auto seq_res_height =
           benchmark_heightmap_seq(mapGenerator, perlinNoise, config);
+      break;
     }
     case GenerationMode::PARALLEL: {
       auto par_res_height =
           benchmark_heightmap_par(mapGenerator, perlinNoise, config);
       test_correctness(referenceResult, par_res_height);
+      break;
     }
     case GenerationMode::CUDA: {
       PerlinNoiseCuda perlinNoise(settings.seed);
       auto cuda_res_height =
           benchmark_heightmap_cuda(mapGenerator, perlinNoise, config);
       test_correctness(referenceResult, cuda_res_height);
+      break;
     }
     default:
       break;
