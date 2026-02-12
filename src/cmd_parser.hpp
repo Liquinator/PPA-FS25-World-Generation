@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-enum class GenerationMode { SEQUENTIAL, PARALLEL, CUDA };
+enum class GenerationMode { SEQUENTIAL, PARALLEL, CUDA, HYBRID };
 
 struct CMDSettings {
   int seed{42};
@@ -24,6 +24,7 @@ const std::unordered_map<std::string, NoArgHandle> NoArgs{
     {"-p", [](CMDSettings& s) { s.mode = GenerationMode::PARALLEL; }},
     {"-s", [](CMDSettings& s) { s.mode = GenerationMode::SEQUENTIAL; }},
     {"-c", [](CMDSettings& s) { s.mode = GenerationMode::CUDA; }},
+    {"-h", [](CMDSettings& s) { s.mode = GenerationMode::HYBRID; }},
     {"-gen_tree", [](CMDSettings& s) { s.gen_tree = true; }},
 };
 
