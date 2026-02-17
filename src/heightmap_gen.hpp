@@ -3,7 +3,7 @@
 #include <glm/glm.hpp>
 #include <vector>
 
-#include "perlin_noise.hpp"
+#include "perlin_noise_cpu.hpp"
 #include "perlin_noise_cuda.hpp"
 
 struct HeightmapConfig {

@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "heightmap_gen.hpp"
-#include "perlin_noise.hpp"
+#include "perlin_noise_cpu.hpp"
 
 struct TreePlacementConfig {
   float treeLine = 0.8;
