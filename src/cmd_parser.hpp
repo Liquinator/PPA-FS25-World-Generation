@@ -14,6 +14,8 @@ struct CMDSettings {
   int seed{42};
   int dimension{256};
   bool gen_tree{false};
+  float hybrid_gen_split{0.95f};
+  float hybrid_norm_split{0.95f};
   GenerationMode mode{GenerationMode::PARALLEL};
 };
 
@@ -33,7 +35,14 @@ const std::unordered_map<std::string, OneArgHandle> OneArg{
      [](CMDSettings& s, const std::string& arg) { s.seed = std::stoi(arg); }},
     {"-dim", [](CMDSettings& s,
                 const std::string& arg) { s.dimension = std::stoi(arg); }},
-
+    {"-hybrid_gen_split",  // percentage of GPU for heightmap generation
+     [](CMDSettings& s, const std::string& arg) {
+       s.hybrid_gen_split = std::stof(arg);
+     }},
+    {"-hybrid_norm_split",  // percentage of GPU for heightmap normalization
+     [](CMDSettings& s, const std::string& arg) {
+       s.hybrid_norm_split = std::stof(arg);
+     }},
 };
 
 inline CMDSettings parse_settings(int argc, char* args[]) {
