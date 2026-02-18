@@ -11,14 +11,13 @@ class PerlinNoiseHybrid {
                     size_t norm_split_point);
   ~PerlinNoiseHybrid();
 
-  void generate_normalized_heightmap(int32_t octaves, float frequency,
-                                     glm::vec2 dim);
+  float* generate_normalized_heightmap(int32_t octaves, float frequency,
+                                       glm::vec2 dim);
 
  private:
   struct Impl;
   std::unique_ptr<Impl> impl;
 
-  cudaStream_t gpu_stream;
   float* heightmap;
   size_t world_size;
 

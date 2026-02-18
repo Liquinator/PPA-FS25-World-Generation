@@ -1,13 +1,14 @@
 #include <cuda_runtime.h>
 #include <thrust/device_ptr.h>
 #include <thrust/execution_policy.h>
+#include <thrust/extrema.h>
 
 #include <glm/glm.hpp>
 #include <random>
 #include <vector>
 
+#include "perlin_common.cuh"
 #include "perlin_noise_cpu.hpp"
-#include "perlin_noise_cuda.cu"
 #include "perlin_noise_hybrid.hpp"
 
 struct PerlinNoiseHybrid::Impl {
@@ -15,6 +16,8 @@ struct PerlinNoiseHybrid::Impl {
   int* unified_perm = nullptr;
   const size_t gen_split_point;
   const size_t norm_split_point;
+
+  cudaStream_t gpu_stream;
 
   Impl(unsigned int seed, const size_t _gen_split_point,
        const size_t _norm_split_point)
@@ -34,17 +37,25 @@ struct PerlinNoiseHybrid::Impl {
     cudaMemLocation location{cudaMemLocationTypeDevice, device_id};
     cudaMemPrefetchAsync(unified_perm, PERM_SIZE * sizeof(int), location, 0);
   }
+
+  ~Impl() {
+    if (unified_perm) cudaFree(unified_perm);
+  }
 };
 
 PerlinNoiseHybrid::PerlinNoiseHybrid(unsigned int seed, size_t gen_split_point,
                                      size_t norm_split_point)
-    : impl(std::make_unique<Impl>(seed, gen_split_point, norm_split_point)) {}
+    : impl(std::make_unique<Impl>(seed, gen_split_point, norm_split_point)) {
+  cudaStreamCreate(&impl->gpu_stream);
+}
 
-PerlinNoiseHybrid::~PerlinNoiseHybrid() = default;
+PerlinNoiseHybrid::~PerlinNoiseHybrid() {
+  if (heightmap) cudaFree(heightmap);
+  cudaStreamDestroy(impl->gpu_stream);
+};
 
 void PerlinNoiseHybrid::generate_heightmap(int32_t octaves, float frequency,
                                            glm::vec2 dim) {
-  cudaStreamCreate(&gpu_stream);
   world_size = (size_t)(dim.x * dim.y);
   cudaMallocManaged(&heightmap, world_size * sizeof(float));
   thrust::device_ptr<float> dev_ptr(heightmap);
@@ -56,30 +67,37 @@ void PerlinNoiseHybrid::generate_heightmap(int32_t octaves, float frequency,
                               octaves, freq_x, freq_y);
 
   thrust::transform(
-      thrust::cuda::par.on(gpu_stream),
+      thrust::cuda::par.on(impl->gpu_stream),
       thrust::make_counting_iterator<size_t>(0),
       thrust::make_counting_iterator<size_t>(impl->gen_split_point), dev_ptr,
       perlinFunctor);
 
   parlay::parallel_for(impl->gen_split_point, world_size,
                        [&](size_t i) { heightmap[i] = perlinFunctor(i); });
+
+  cudaStreamSynchronize(impl->gpu_stream);
 }
 
-void PerlinNoiseHybrid::generate_normalized_heightmap(int32_t octaves,
-                                                      float frequency,
-                                                      glm::vec2 dim) {
+float* PerlinNoiseHybrid::generate_normalized_heightmap(int32_t octaves,
+                                                        float frequency,
+                                                        glm::vec2 dim) {
   generate_heightmap(octaves, frequency, dim);
-  auto result = thrust::minmax_element(thrust::cuda::par.on(gpu_stream),
-                                       &heightmap, &heightmap + world_size);
 
-  auto minmax = std::minmax_element(heightmap, heightmap + world_size);
-  float min_val = *minmax.first;
-  float max_val = *minmax.second;
-  float range = max_val - min_val;
+  auto cuda_minmax =
+      thrust::minmax_element(thrust::cuda::par.on(impl->gpu_stream), heightmap,
+                             heightmap + world_size);
 
-  if (range <= 0.00001) return;
+  float gpu_min_val = *cuda_minmax.first;
+  float gpu_max_val = *cuda_minmax.second;
+  thrust::device_ptr<float> dev_ptr(heightmap);
 
-  parlay::parallel_for(
-      impl->norm_split_point, static_cast<size_t>(*heightmap) + world_size,
-      [&](size_t i) { heightmap[i] = (heightmap[i] - min_val) / range; });
+  thrust::transform(
+      thrust::cuda::par.on(impl->gpu_stream),
+      thrust::make_counting_iterator<size_t>(0),
+      thrust::make_counting_iterator<size_t>(impl->norm_split_point), dev_ptr,
+      NormalizeFunctor(gpu_min_val, gpu_max_val));
+
+  cudaStreamSynchronize(impl->gpu_stream);
+
+  return heightmap;
 }
