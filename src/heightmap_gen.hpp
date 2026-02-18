@@ -5,6 +5,7 @@
 
 #include "perlin_noise_cpu.hpp"
 #include "perlin_noise_cuda.hpp"
+#include "perlin_noise_hybrid.hpp"
 
 struct HeightmapConfig {
   int width;

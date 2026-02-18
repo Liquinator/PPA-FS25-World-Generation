@@ -12,39 +12,38 @@
 #include "perlin_noise_cuda.hpp"
 
 struct PerlinFunctor {
-  const int* permutation;
+  const int* __restrict__ permutation;
   int width;
   int height;
   int octaves;
   float freq_x;
   float freq_y;
-
-  PerlinFunctor(const int* _perm, int _width, int _height, int _octaves,
-                float _freq_x, float _freq_y)
+  __host__ __device__ PerlinFunctor(const int* _perm, int _width, int _height,
+                                    int _octaves, float _freq_x, float _freq_y)
       : permutation(_perm),
         width(_width),
         height(_height),
         octaves(_octaves),
         freq_x(_freq_x),
         freq_y(_freq_y) {}
-
-  __device__ float fade(const float t) const {
+  __host__ __device__ float fade(const float t) const {
     return t * t * t * (t * (t * 6 - 15) + 10);
   }
 
-  __device__ float lerp(const float t, const float a, const float b) const {
+  __host__ __device__ float lerp(const float t, const float a,
+                                 const float b) const {
     return (a + (b - a) * t);
   }
 
-  __device__ float grad(const int hash, const float x,
-                        const float y) const noexcept {
+  __host__ __device__ float grad(const int hash, const float x,
+                                 const float y) const noexcept {
     const int h = hash & 15;
     const float u = (h < 8) ? x : y;
     const float v = (h < 4) ? y : (h == 12 || h == 14 ? x : 0.0);
     return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
   }
 
-  __device__ float noise(float x, float y) const {
+  __host__ __device__ float noise(float x, float y) const {
     int X = ((int)floorf(x)) & 255;
     int Y = ((int)floorf(y)) & 255;
 
@@ -70,8 +69,8 @@ struct PerlinFunctor {
     return lerp(v, top_edge, bottom_edge);
   }
 
-  __device__ float octaveNoise(float x, float y,
-                               const float persistence = 0.5) const {
+  __host__ __device__ float octaveNoise(float x, float y,
+                                        const float persistence = 0.5) const {
     float total = 0.0;
     float amplitude = 1.0;
 
@@ -85,7 +84,7 @@ struct PerlinFunctor {
     return total;
   }
 
-  __device__ float operator()(const size_t idx) const {
+  __host__ __device__ float operator()(const size_t idx) const {
     int x_idx = idx % height;
     int y_idx = idx / width;
 
@@ -109,7 +108,6 @@ struct NormalizeFunctor {
   }
 };
 
-namespace {
 thrust::device_vector<float> generate_heightmap(
     const thrust::device_vector<int>& device_permutation, int32_t octaves,
     float frequency, glm::vec2 dim) {
@@ -128,7 +126,6 @@ thrust::device_vector<float> generate_heightmap(
                     device_results.begin(), perlinFunctor);
 
   return device_results;
-}
 }
 
 struct PerlinNoiseCuda::Impl {
@@ -161,12 +158,13 @@ std::vector<float> PerlinNoiseCuda::generate_normalized_heightmap(
   float min_val = *result.first;
   float max_val = *result.second;
 
+  // TODO Normalization happens in thrust on device.
+  // Should this be hybridized as well?
+
   thrust::transform(device_results.begin(), device_results.end(),
                     device_results.begin(), NormalizeFunctor(min_val, max_val));
   std::vector<float> heightmap(device_results.size());
   thrust::copy(device_results.begin(), device_results.end(), heightmap.begin());
 
-  // TODO Either reshape to 2D vector or refactor original parlay impl 1D
-  // vector
   return heightmap;
 }

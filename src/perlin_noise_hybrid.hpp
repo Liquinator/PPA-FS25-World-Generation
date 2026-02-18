@@ -2,18 +2,25 @@
 
 #include <cstdint>
 #include <glm/glm.hpp>
+#include <memory>
 #include <vector>
 
 class PerlinNoiseHybrid {
  public:
-  PerlinNoiseHybrid(unsigned int seed) {};
+  PerlinNoiseHybrid(unsigned int seed, size_t gen_split_point,
+                    size_t norm_split_point);
+  ~PerlinNoiseHybrid();
 
-  std::vector<float> generate_normalized_heightmap(int32_t octaves,
-                                                   float frequency,
-                                                   glm::vec2 dim) const {
-    split_point = dim.length();
-  };
+  void generate_normalized_heightmap(int32_t octaves, float frequency,
+                                     glm::vec2 dim);
 
  private:
-  const size_t split_point;
+  struct Impl;
+  std::unique_ptr<Impl> impl;
+
+  cudaStream_t gpu_stream;
+  float* heightmap;
+  size_t world_size;
+
+  void generate_heightmap(int32_t octaves, float frequency, glm::vec2 dim);
 };
