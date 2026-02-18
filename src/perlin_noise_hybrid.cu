@@ -23,7 +23,13 @@ struct PerlinNoiseHybrid::Impl {
        const float _norm_split_point_percent)
       : gen_split_point_percent(_gen_split_point_percent),
         norm_split_point_percent(_norm_split_point_percent) {
+    int device_id;
+    cudaGetDevice(&device_id);
+    cudaMemLocation location{cudaMemLocationTypeDevice, device_id};
     cudaMallocManaged(&unified_perm, PERM_SIZE * sizeof(int));
+    cudaMemAdvise(unified_perm, PERM_SIZE * sizeof(int),
+                  cudaMemAdviseSetReadMostly, location);
+
     std::vector<int> p(256);
     std::iota(p.begin(), p.end(), 0);
     std::default_random_engine engine(seed);
@@ -33,9 +39,6 @@ struct PerlinNoiseHybrid::Impl {
       unified_perm[i] = p[i % 256];
     }
 
-    int device_id;
-    cudaGetDevice(&device_id);
-    cudaMemLocation location{cudaMemLocationTypeDevice, device_id};
     cudaMemPrefetchAsync(unified_perm, PERM_SIZE * sizeof(int), location, 0);
   }
 
