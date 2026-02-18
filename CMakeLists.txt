@@ -13,6 +13,7 @@ find_package(CUDAToolkit REQUIRED)
 add_executable(benchmark_world_gen
     main.cpp
     src/perlin_noise_cuda.cu
+    src/perlin_noise_hybrid.cu
 )
 
 target_include_directories(benchmark_world_gen

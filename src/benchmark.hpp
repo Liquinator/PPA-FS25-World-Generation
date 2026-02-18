@@ -6,7 +6,6 @@
 
 #include "cmd_parser.hpp"
 #include "heightmap_gen.hpp"
-#include "perlin_noise_cuda.hpp"
 #include "tree_gen.hpp"
 
 double WARMUP_TIME_THRESHOLD = 3.0;

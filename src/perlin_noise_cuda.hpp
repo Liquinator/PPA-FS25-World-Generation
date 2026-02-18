@@ -1,9 +1,9 @@
 #pragma once
 
-#include <glm/glm.hpp>
-#include <vector>
 #include <cstdint>
+#include <glm/glm.hpp>
 #include <memory>
+#include <vector>
 
 class PerlinNoiseCuda {
  public:
@@ -11,9 +11,10 @@ class PerlinNoiseCuda {
   ~PerlinNoiseCuda();
 
   std::vector<float> generate_normalized_heightmap(int32_t octaves,
-                                                   float frequency, glm::vec2) const;
+                                                   float frequency,
+                                                   glm::vec2 dim) const;
 
-private:
+ private:
   struct Impl;
   std::unique_ptr<Impl> impl;
 };
