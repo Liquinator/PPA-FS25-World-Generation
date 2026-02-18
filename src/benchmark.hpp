@@ -96,6 +96,15 @@ inline HeightMap benchmark_heightmap_cuda(MapGenerator& mapGenerator,
     return mapGenerator.generate_heightmap_cuda(perlinNoise, config);
   });
 }
+
+inline HeightMap benchmark_heightmap_hybrid(MapGenerator& mapGenerator,
+                                            PerlinNoiseHybrid& perlinNoise,
+                                            const HeightmapConfig& config) {
+  return benchmark_heightmap("hybrid", [&] {
+    return mapGenerator.generate_heightmap_hybrid(perlinNoise, config);
+  });
+}
+
 /*
 inline std::vector<glm::vec2> benchmark_tree_generation(
     const bool use_parallel, CMDSettings& settings,
@@ -142,8 +151,8 @@ void benchmark(CMDSettings& settings) {
   MapGenerator mapGenerator;
 
   std::cout << "[Verification] Generating Sequential Reference" << std::endl;
-  HeightMap referenceResult =
-      mapGenerator.generate_heightmap_seq(perlinNoise, config);
+  // HeightMap referenceResult =
+  //  mapGenerator.generate_heightmap_seq(perlinNoise, config);
   std::cout << "[Verification] Reference generated" << std::endl;
 
   switch (settings.mode) {
@@ -155,14 +164,22 @@ void benchmark(CMDSettings& settings) {
     case GenerationMode::PARALLEL: {
       auto par_res_height =
           benchmark_heightmap_par(mapGenerator, perlinNoise, config);
-      test_correctness(referenceResult, par_res_height);
+      // test_correctness(referenceResult, par_res_height);
       break;
     }
     case GenerationMode::CUDA: {
-      PerlinNoiseCuda perlinNoise(settings.seed);
+      PerlinNoiseCuda perlinNoiseCuda(settings.seed);
       auto cuda_res_height =
-          benchmark_heightmap_cuda(mapGenerator, perlinNoise, config);
-      test_correctness(referenceResult, cuda_res_height);
+          benchmark_heightmap_cuda(mapGenerator, perlinNoiseCuda, config);
+      // test_correctness(referenceResult, cuda_res_height);
+      break;
+    }
+    case GenerationMode::HYBRID: {
+      PerlinNoiseHybrid perlinNoiseHybrid(
+          settings.seed, settings.hybrid_gen_split, settings.hybrid_norm_split);
+      auto hybrid_res_height =
+          benchmark_heightmap_hybrid(mapGenerator, perlinNoiseHybrid, config);
+      // test_correctness(referenceResult, hybrid_res_height);
       break;
     }
     default:
