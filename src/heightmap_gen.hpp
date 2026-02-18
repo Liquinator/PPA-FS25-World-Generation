@@ -57,6 +57,19 @@ class MapGenerator {
     return heightmap;
   }
 
+  HeightMap generate_heightmap_hybrid(PerlinNoiseHybrid& noise,
+                                      const HeightmapConfig& config) {
+    HeightMap heightmap(config.width, config.height);
+    auto norm_heightmap = noise.generate_normalized_heightmap(
+        config.octaves, config.frequency,
+        glm::vec2(config.width, config.height));
+
+    heightmap.data = std::vector<float>(
+        norm_heightmap, norm_heightmap + config.width * config.height);
+
+    return heightmap;
+  }
+
  private:
   // TODO Include sequential normalization
   void normalize(HeightMap& heightmap) {
