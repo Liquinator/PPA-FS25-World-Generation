@@ -19,6 +19,8 @@ add_executable(benchmark_world_gen
 target_include_directories(benchmark_world_gen
     PRIVATE
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/include/parlay/include
+        ${CMAKE_SOURCE_DIR}/include/moderngpu/src
         ${CMAKE_SOURCE_DIR}/src
         ${CUDAToolkit_INCLUDE_DIRS}
 )
