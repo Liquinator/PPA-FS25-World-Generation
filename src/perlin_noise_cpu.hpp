@@ -1,31 +1,30 @@
 #pragma once
 
+#include "parlay/primitives.h"
+#include "parlay/sequence.h"
 #include <algorithm>
 #include <glm/glm.hpp>
 #include <random>
-#include <vector>
-
-#include "parlay/primitives.h"
 
 struct HeightMap {
   int width;
   int height;
-  std::vector<float> data;
+  parlay::sequence<float> data;
 
   HeightMap(int _width, int _height)
       : width(_width), height(_height), data(_width * _height) {}
-  float& at(int x, int y) { return data[y * width + x]; }
+  float &at(int x, int y) { return data[y * width + x]; }
 };
 
 class PerlinNoise {
- public:
-  PerlinNoise(const unsigned int seed) {
-    permutation.resize(256);
-    std::iota(permutation.begin(), permutation.end(), 0);
+public:
+  PerlinNoise(const unsigned int seed) : permutation(512) {
+    auto p = parlay::tabulate<int>(256, [](size_t i) { return (int)i; });
     std::default_random_engine engine(seed);
-    std::shuffle(permutation.begin(), permutation.end(), engine);
-    permutation.insert(permutation.end(), permutation.begin(),
-                       permutation.end());
+    std::shuffle(p.begin(), p.end(), engine);
+    for (int i = 0; i < 512; i++) {
+      permutation[i] = p[i % 256];
+    }
   };
 
   float octaveNoise(float x, float y, const int octaves,
@@ -43,8 +42,8 @@ class PerlinNoise {
     return total;
   }
 
- private:
-  std::vector<int> permutation;
+private:
+  parlay::sequence<int> permutation;
   float fade(const float t) const noexcept {
     return t * t * t * (t * (t * 6 - 15) + 10);
   }

@@ -5,7 +5,6 @@
 #include <glm/glm.hpp>
 #include <parlay/sequence.h>
 #include <random>
-#include <vector>
 
 #include "perlin_common.cuh"
 #include "perlin_noise_cpu.hpp"
@@ -24,8 +23,7 @@ struct PerlinNoiseHybrid::Impl {
       : unified_perm(PERM_SIZE),
         gen_split_point_percent(_gen_split_point_percent),
         norm_split_point_percent(_norm_split_point_percent) {
-    std::vector<int> p(256);
-    std::iota(p.begin(), p.end(), 0);
+    auto p = parlay::tabulate<int>(256, [](size_t i) { return (int)i; });
     std::default_random_engine engine(seed);
     std::shuffle(p.begin(), p.end(), engine);
 
@@ -63,21 +61,22 @@ void PerlinNoiseHybrid::generate_heightmap(int32_t octaves, float frequency,
                               octaves, freq_x, freq_y);
   parlay::par_do(
       [&]() {
-        thrust::transform(thrust::cuda::par.on(impl->gpu_stream),
-                          thrust::make_counting_iterator<size_t>(0),
-                          thrust::make_counting_iterator<size_t>(gen_split_point),
-                          gpu_part.begin(), perlinFunctor);
+        thrust::transform(
+            thrust::cuda::par.on(impl->gpu_stream),
+            thrust::make_counting_iterator<size_t>(0),
+            thrust::make_counting_iterator<size_t>(gen_split_point),
+            gpu_part.begin(), perlinFunctor);
       },
       [&]() {
-        parlay::parallel_for(0, cpu_part.size(),
-                             [&](size_t i) { cpu_part[i] = perlinFunctor(gen_split_point + i); });
+        parlay::parallel_for(0, cpu_part.size(), [&](size_t i) {
+          cpu_part[i] = perlinFunctor(gen_split_point + i);
+        });
       });
   cudaStreamSynchronize(impl->gpu_stream);
 }
 
-float *PerlinNoiseHybrid::generate_normalized_heightmap(int32_t octaves,
-                                                        float frequency,
-                                                        glm::vec2 dim) {
+parlay::sequence<float> PerlinNoiseHybrid::generate_normalized_heightmap(
+    int32_t octaves, float frequency, glm::vec2 dim) {
   generate_heightmap(octaves, frequency, dim);
   size_t norm_split_point = impl->norm_split_point_percent * world_size;
   auto gpu_part = heightmap.cut(0, norm_split_point);
@@ -100,11 +99,11 @@ float *PerlinNoiseHybrid::generate_normalized_heightmap(int32_t octaves,
       },
       [&]() {
         parlay::parallel_for(0, cpu_part.size(), [&](size_t i) {
-          cpu_part[i] = (range == 0.0f) ? 0.0f
-                                        : (cpu_part[i] - gpu_min_val) / range;
+          cpu_part[i] =
+              (range == 0.0f) ? 0.0f : (cpu_part[i] - gpu_min_val) / range;
         });
       });
   cudaStreamSynchronize(impl->gpu_stream);
 
-  return heightmap.data();
+  return std::move(heightmap);
 }

@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <glm/glm.hpp>
 #include <numeric>
+#include <parlay/sequence.h>
 #include <random>
-#include <vector>
 
 #include "perlin_common.cuh"
 #include "perlin_noise_cuda.hpp"
@@ -52,7 +52,7 @@ PerlinNoiseCuda::PerlinNoiseCuda(unsigned int seed)
 
 PerlinNoiseCuda::~PerlinNoiseCuda() = default;
 
-std::vector<float> PerlinNoiseCuda::generate_normalized_heightmap(
+parlay::sequence<float> PerlinNoiseCuda::generate_normalized_heightmap(
     int32_t octaves, float frequency, glm::vec2 dim) const {
   thrust::device_vector<float> device_results =
       generate_heightmap(impl->device_permutation, octaves, frequency, dim);
@@ -64,7 +64,7 @@ std::vector<float> PerlinNoiseCuda::generate_normalized_heightmap(
 
   thrust::transform(device_results.begin(), device_results.end(),
                     device_results.begin(), NormalizeFunctor(min_val, max_val));
-  std::vector<float> heightmap(device_results.size());
+  parlay::sequence<float> heightmap(device_results.size());
   thrust::copy(device_results.begin(), device_results.end(), heightmap.begin());
 
   return heightmap;

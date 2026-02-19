@@ -12,8 +12,9 @@ class PerlinNoiseHybrid {
                     float norm_split_point_percent);
   ~PerlinNoiseHybrid();
 
-  float* generate_normalized_heightmap(int32_t octaves, float frequency,
-                                       glm::vec2 dim);
+  parlay::sequence<float> generate_normalized_heightmap(int32_t octaves,
+                                                        float frequency,
+                                                        glm::vec2 dim);
 
  private:
   struct Impl;
