@@ -1,11 +1,9 @@
-#include <thrust/device_vector.h>
+#include <cuda_runtime.h>
 #include <thrust/execution_policy.h>
 #include <thrust/extrema.h>
-#include <thrust/host_vector.h>
 
-#include <algorithm>
 #include <glm/glm.hpp>
-#include <numeric>
+#include <parlay/primitives.h>
 #include <parlay/sequence.h>
 #include <random>
 
@@ -13,39 +11,23 @@
 #include "perlin_common.cuh"
 #include "perlin_noise_cuda.hpp"
 
-thrust::device_vector<float> generate_heightmap(
-    const thrust::device_vector<int>& device_permutation, int32_t octaves,
-    float frequency, glm::vec2 dim) {
-  size_t world_size = (size_t)(dim.x * dim.y);
-  thrust::device_vector<float> device_results(world_size);
-
-  float freq_x = (float)(frequency / dim.x);
-  float freq_y = (float)(frequency / dim.y);
-
-  PerlinFunctor perlinFunctor(
-      thrust::raw_pointer_cast(device_permutation.data()), (int)dim.x,
-      (int)dim.y, octaves, freq_x, freq_y);
-
-  thrust::transform(thrust::make_counting_iterator<size_t>(0),
-                    thrust::make_counting_iterator<size_t>(world_size),
-                    device_results.begin(), perlinFunctor);
-
-  return device_results;
-}
-
 struct PerlinNoiseCuda::Impl {
-  thrust::device_vector<int> device_permutation;
+  parlay::sequence<int> permutation;
+  cudaStream_t stream;
 
-  Impl(unsigned int seed) {
-    std::vector<int> p(256);
-    std::iota(p.begin(), p.end(), 0);
-
+  Impl(unsigned int seed) : permutation(512) {
+    auto p = parlay::tabulate<int>(256, [](size_t i) { return (int)i; });
     std::default_random_engine engine(seed);
     std::shuffle(p.begin(), p.end(), engine);
 
-    p.insert(p.end(), p.begin(), p.end());
-    device_permutation = p;
+    for (int i = 0; i < 512; i++) {
+      permutation[i] = p[i % 256];
+    }
+
+    cudaStreamCreate(&stream);
   }
+
+  ~Impl() { cudaStreamDestroy(stream); }
 };
 
 PerlinNoiseCuda::PerlinNoiseCuda(unsigned int seed)
@@ -56,23 +38,33 @@ PerlinNoiseCuda::~PerlinNoiseCuda() = default;
 parlay::sequence<float> PerlinNoiseCuda::generate_normalized_heightmap(
     int32_t octaves, float frequency, glm::vec2 dim) const {
   parlay::internal::timer t(std::string("cuda"));
-  thrust::device_vector<float> device_results =
-      generate_heightmap(impl->device_permutation, octaves, frequency, dim);
+  size_t world_size = (size_t)(dim.x * dim.y);
+  parlay::sequence<float> heightmap(world_size);
+
+  float freq_x = (float)(frequency / dim.x);
+  float freq_y = (float)(frequency / dim.y);
+
+  PerlinFunctor perlinFunctor(impl->permutation.data(), (int)dim.x, (int)dim.y,
+                              octaves, freq_x, freq_y);
+
+  thrust::transform(thrust::cuda::par.on(impl->stream),
+                    thrust::make_counting_iterator<size_t>(0),
+                    thrust::make_counting_iterator<size_t>(world_size),
+                    heightmap.begin(), perlinFunctor);
+  cudaStreamSynchronize(impl->stream);
   t.next("generation");
 
-  auto result =
-      thrust::minmax_element(device_results.begin(), device_results.end());
+  auto result = thrust::minmax_element(thrust::cuda::par.on(impl->stream),
+                                       heightmap.begin(), heightmap.end());
   float min_val = *result.first;
   float max_val = *result.second;
   t.next("minmax");
 
-  thrust::transform(device_results.begin(), device_results.end(),
-                    device_results.begin(), NormalizeFunctor(min_val, max_val));
+  thrust::transform(thrust::cuda::par.on(impl->stream), heightmap.begin(),
+                    heightmap.end(), heightmap.begin(),
+                    NormalizeFunctor(min_val, max_val));
+  cudaStreamSynchronize(impl->stream);
   t.next("normalization");
-
-  parlay::sequence<float> heightmap(device_results.size());
-  thrust::copy(device_results.begin(), device_results.end(), heightmap.begin());
-  t.next("device_to_host_copy");
   t.total();
 
   return heightmap;
