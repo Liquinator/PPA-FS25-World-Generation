@@ -30,7 +30,7 @@ public:
       }
     }
     t.next("generation");
-    normalize(heightmap);
+    normalize_seq(heightmap);
     t.next("normalization");
     t.total();
     return heightmap;
@@ -75,10 +75,24 @@ public:
   }
 
 private:
-  // TODO Include sequential normalization
-  void normalize(HeightMap &heightmap) {
+  void normalize_seq(HeightMap &heightmap) {
     auto minmax =
         std::minmax_element(heightmap.data.begin(), heightmap.data.end());
+    float min_val = *minmax.first;
+    float max_val = *minmax.second;
+    float range = max_val - min_val;
+
+    if (range <= 0.00001)
+      return;
+
+    for (size_t i = 0; i < heightmap.data.size(); i++) {
+      heightmap.data[i] = (heightmap.data[i] - min_val) / range;
+    }
+  }
+
+  void normalize(HeightMap &heightmap) {
+    auto minmax =
+        parlay::minmax_element(heightmap.data);
     float min_val = *minmax.first;
     float max_val = *minmax.second;
     float range = max_val - min_val;
