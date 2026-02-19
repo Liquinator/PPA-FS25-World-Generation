@@ -12,7 +12,8 @@ struct HeightMap {
   parlay::sequence<float> data;
 
   HeightMap(int _width, int _height)
-      : width(_width), height(_height), data(_width * _height) {}
+      : width(_width), height(_height),
+        data(parlay::sequence<float>::uninitialized(_width * _height)) {}
   float &at(int x, int y) { return data[y * width + x]; }
 };
 
@@ -59,13 +60,13 @@ private:
   }
 
   float noise(float x, float y) const {
-    const float _x = std::floor(x);
-    const float _y = std::floor(y);
-    int X = static_cast<int>(_x) & 255;
-    int Y = static_cast<int>(_y) & 255;
+    const float fx = std::floor(x);
+    const float fy = std::floor(y);
+    int X = static_cast<int>(fx) & 255;
+    int Y = static_cast<int>(fy) & 255;
 
-    x -= std::floor(x);
-    y -= std::floor(y);
+    x -= fx;
+    y -= fy;
 
     float u = fade(x);
     float v = fade(y);
