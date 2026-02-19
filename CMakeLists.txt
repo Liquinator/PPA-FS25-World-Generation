@@ -31,6 +31,7 @@ target_compile_options(benchmark_world_gen
             -march=native
             -O3
             -ffast-math
+            -fopenmp-simd
             -pthread
             -Wno-subobject-linkage
             -Wno-overflow

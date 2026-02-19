@@ -6,6 +6,10 @@
 #include <glm/glm.hpp>
 #include <random>
 
+#if defined(__aarch64__) && !defined(__CUDACC__)
+#include <arm_neon.h>
+#endif
+
 struct HeightMap {
   int width;
   int height;
@@ -45,14 +49,14 @@ public:
 
   // Tiled: octave-first, row-parallel, cell-segmented inner loop.
   // Precomputes corner hashes once per cell so the inner loop is pure
-  // arithmetic (no gathers) and auto-vectorizes with NEON/SVE.
-  void octaveNoiseTiled(float *data, int width, int height, int octaves,
-                        float freq_x, float freq_y,
+  // arithmetic (no gathers)
+  void octaveNoiseTiled(float *__restrict__ data, int width, int height,
+                        int octaves, float freq_x, float freq_y,
                         float persistence = 0.5f) const {
-    static constexpr float GX[16] = {1,  -1, 1, -1, 1, -1, 1,  -1,
-                                     0,  0,  0, 0,  1, 0,  -1, 0};
-    static constexpr float GY[16] = {1, 1, -1, -1, 0, 0, 0, 0,
-                                     1, -1, 1, -1, 1, -1, 1, -1};
+    static constexpr float GX[16] = {1, -1, 1, -1, 1, -1, 1,  -1,
+                                     0, 0,  0, 0,  1, 0,  -1, 0};
+    static constexpr float GY[16] = {1, 1,  -1, -1, 0, 0,  0, 0,
+                                     1, -1, 1,  -1, 1, -1, 1, -1};
 
     const int *perm = permutation.data();
     float amplitude = 1.0f;
@@ -99,24 +103,93 @@ public:
 
           // End of this cell in pixel space
           int px_end = static_cast<int>((cell_x + 1) / sx) + 1;
-          if (px_end > width) px_end = width;
+          if (px_end > width)
+            px_end = width;
 
-          // Inner loop: pure FMA, no gathers, SIMD-friendly
-          for (int p = px; p < px_end; ++p) {
-            float frac_x = p * sx - cell_x;
-            float u = fade(frac_x);
+          float base_frac = px * sx - cell_x;
+          int count = px_end - px;
 
-            float corner_aa = cx_aa * frac_x + gy_aa;
-            float corner_ab = cx_ab * frac_x + gy_ab;
-            float corner_ba = cx_ba * (frac_x - 1.0f) + gy_ba;
-            float corner_bb = cx_bb * (frac_x - 1.0f) + gy_bb;
+#if defined(__aarch64__) && !defined(__CUDACC__)
+          {
+            const float32x4_t v_cx_aa = vdupq_n_f32(cx_aa);
+            const float32x4_t v_cx_ab = vdupq_n_f32(cx_ab);
+            const float32x4_t v_cx_ba = vdupq_n_f32(cx_ba);
+            const float32x4_t v_cx_bb = vdupq_n_f32(cx_bb);
+            const float32x4_t v_gy_aa = vdupq_n_f32(gy_aa);
+            const float32x4_t v_gy_ab = vdupq_n_f32(gy_ab);
+            const float32x4_t v_gy_ba = vdupq_n_f32(gy_ba);
+            const float32x4_t v_gy_bb = vdupq_n_f32(gy_bb);
+            const float32x4_t v_v = vdupq_n_f32(v);
+            const float32x4_t v_amp = vdupq_n_f32(amplitude);
+            const float32x4_t v_one = vdupq_n_f32(1.0f);
+            const float32x4_t v_six = vdupq_n_f32(6.0f);
+            const float32x4_t v_neg15 = vdupq_n_f32(-15.0f);
+            const float32x4_t v_ten = vdupq_n_f32(10.0f);
+            const float32x4_t v_step4 = vdupq_n_f32(4.0f * sx);
 
-            float top = corner_aa + u * (corner_ba - corner_aa);
-            float bot = corner_ab + u * (corner_bb - corner_ab);
-            float val = top + v * (bot - top);
+            float init[4] = {base_frac, base_frac + sx, base_frac + 2.0f * sx,
+                             base_frac + 3.0f * sx};
+            float32x4_t v_frac = vld1q_f32(init);
 
-            row[p] += val * amplitude;
+            int i = 0;
+            for (; i + 4 <= count; i += 4) {
+              float32x4_t fm1 = vsubq_f32(v_frac, v_one);
+
+              // fade(t) = t^3 * (t * (t * 6 - 15) + 10)
+              float32x4_t t2 = vmulq_f32(v_frac, v_frac);
+              float32x4_t t3 = vmulq_f32(t2, v_frac);
+              float32x4_t poly = vfmaq_f32(v_neg15, v_frac, v_six);
+              poly = vfmaq_f32(v_ten, v_frac, poly);
+              float32x4_t u = vmulq_f32(t3, poly);
+
+              // Dot products at 4 corners
+              float32x4_t d_aa = vfmaq_f32(v_gy_aa, v_cx_aa, v_frac);
+              float32x4_t d_ab = vfmaq_f32(v_gy_ab, v_cx_ab, v_frac);
+              float32x4_t d_ba = vfmaq_f32(v_gy_ba, v_cx_ba, fm1);
+              float32x4_t d_bb = vfmaq_f32(v_gy_bb, v_cx_bb, fm1);
+
+              // Bilinear interpolation
+              float32x4_t top = vfmaq_f32(d_aa, u, vsubq_f32(d_ba, d_aa));
+              float32x4_t bot = vfmaq_f32(d_ab, u, vsubq_f32(d_bb, d_ab));
+              float32x4_t interp = vfmaq_f32(top, v_v, vsubq_f32(bot, top));
+
+              // Accumulate: row[px+i] += interp * amplitude
+              float32x4_t prev = vld1q_f32(row + px + i);
+              vst1q_f32(row + px + i, vfmaq_f32(prev, interp, v_amp));
+
+              v_frac = vaddq_f32(v_frac, v_step4);
+            }
+
+            // Scalar tail for remaining 0-3 pixels
+            for (; i < count; ++i) {
+              float frac_x = base_frac + i * sx;
+              float fm1 = frac_x - 1.0f;
+              float u = frac_x * frac_x * frac_x *
+                        (frac_x * (frac_x * 6.0f - 15.0f) + 10.0f);
+              float top =
+                  (cx_aa * frac_x + gy_aa) +
+                  u * ((cx_ba * fm1 + gy_ba) - (cx_aa * frac_x + gy_aa));
+              float bot =
+                  (cx_ab * frac_x + gy_ab) +
+                  u * ((cx_bb * fm1 + gy_bb) - (cx_ab * frac_x + gy_ab));
+              row[px + i] += (top + v * (bot - top)) * amplitude;
+            }
           }
+#else
+          for (int i = 0; i < count; ++i) {
+            float frac_x = base_frac + i * sx;
+            float fm1 = frac_x - 1.0f;
+            float u = frac_x * frac_x * frac_x *
+                      (frac_x * (frac_x * 6.0f - 15.0f) + 10.0f);
+
+            float top = (cx_aa * frac_x + gy_aa) +
+                        u * ((cx_ba * fm1 + gy_ba) - (cx_aa * frac_x + gy_aa));
+            float bot = (cx_ab * frac_x + gy_ab) +
+                        u * ((cx_bb * fm1 + gy_bb) - (cx_ab * frac_x + gy_ab));
+
+            row[px + i] += (top + v * (bot - top)) * amplitude;
+          }
+#endif
 
           px = px_end;
         }
