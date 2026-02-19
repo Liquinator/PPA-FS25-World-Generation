@@ -56,6 +56,25 @@ public:
     return heightmap;
   }
 
+  HeightMap generate_heightmap_par_tiled(const PerlinNoise &noise,
+                                         const HeightmapConfig &config) {
+    parlay::internal::timer t(std::string("tiled"));
+    HeightMap heightmap(config.width, config.height);
+    parlay::parallel_for(0, heightmap.data.size(),
+                         [&](size_t i) { heightmap.data[i] = 0.0f; });
+
+    float freq_x = static_cast<float>(config.frequency / config.width);
+    float freq_y = static_cast<float>(config.frequency / config.height);
+
+    noise.octaveNoiseTiled(heightmap.data.data(), config.width, config.height,
+                           config.octaves, freq_x, freq_y);
+    t.next("generation");
+    normalize(heightmap);
+    t.next("normalization");
+    t.total();
+    return heightmap;
+  }
+
   HeightMap generate_heightmap_cuda(const PerlinNoiseCuda &noise,
                                     const HeightmapConfig &config) {
     HeightMap heightmap(config.width, config.height);
@@ -91,8 +110,7 @@ private:
   }
 
   void normalize(HeightMap &heightmap) {
-    auto minmax =
-        parlay::minmax_element(heightmap.data);
+    auto minmax = parlay::minmax_element(heightmap.data);
     float min_val = *minmax.first;
     float max_val = *minmax.second;
     float range = max_val - min_val;

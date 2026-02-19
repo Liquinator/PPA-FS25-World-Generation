@@ -79,6 +79,14 @@ inline HeightMap benchmark_heightmap_par(MapGenerator &mapGenerator,
   });
 }
 
+inline HeightMap benchmark_heightmap_par_tiled(MapGenerator &mapGenerator,
+                                               const PerlinNoise &perlinNoise,
+                                               const HeightmapConfig &config) {
+  return benchmark_heightmap("tiled", [&] {
+    return mapGenerator.generate_heightmap_par_tiled(perlinNoise, config);
+  });
+}
+
 inline HeightMap benchmark_heightmap_cuda(MapGenerator &mapGenerator,
                                           const PerlinNoiseCuda &perlinNoise,
                                           const HeightmapConfig &config) {
@@ -155,6 +163,12 @@ void benchmark(CMDSettings &settings) {
     auto par_res_height =
         benchmark_heightmap_par(mapGenerator, perlinNoise, config);
     // test_correctness(referenceResult, par_res_height);
+    break;
+  }
+  case GenerationMode::TILED: {
+    auto tiled_res_height =
+        benchmark_heightmap_par_tiled(mapGenerator, perlinNoise, config);
+    // test_correctness(referenceResult, tiled_res_height);
     break;
   }
   case GenerationMode::CUDA: {
