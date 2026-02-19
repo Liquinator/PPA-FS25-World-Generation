@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <memory>
+#include <parlay/sequence.h>
 #include <vector>
 
 class PerlinNoiseHybrid {
@@ -11,14 +12,15 @@ class PerlinNoiseHybrid {
                     float norm_split_point_percent);
   ~PerlinNoiseHybrid();
 
-  float* generate_normalized_heightmap(int32_t octaves, float frequency,
-                                       glm::vec2 dim);
+  parlay::sequence<float> generate_normalized_heightmap(int32_t octaves,
+                                                        float frequency,
+                                                        glm::vec2 dim);
 
  private:
   struct Impl;
   std::unique_ptr<Impl> impl;
 
-  float* heightmap;
+  parlay::sequence<float> heightmap;
   size_t world_size;
 
   void generate_heightmap(int32_t octaves, float frequency, glm::vec2 dim);

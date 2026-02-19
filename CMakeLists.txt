@@ -19,6 +19,8 @@ add_executable(benchmark_world_gen
 target_include_directories(benchmark_world_gen
     PRIVATE
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/include/parlay/include
+        ${CMAKE_SOURCE_DIR}/include/moderngpu/src
         ${CMAKE_SOURCE_DIR}/src
         ${CUDAToolkit_INCLUDE_DIRS}
 )
@@ -28,6 +30,8 @@ target_compile_options(benchmark_world_gen
         $<$<COMPILE_LANGUAGE:CXX>:
             -march=native
             -O3
+            -ffast-math
+            -fopenmp-simd
             -pthread
             -Wno-subobject-linkage
             -Wno-overflow

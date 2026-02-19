@@ -1,0 +1,22 @@
+CompileFlags:
+  Add:
+    - "-xcuda"
+    - "-I/usr/local/cuda/include"
+    - "--no-cuda-version-check"
+    - "-nocudalib"
+    # sm_90 used as stand-in; clangd 18 doesn't know sm_120 (Blackwell)
+    - "--cuda-gpu-arch=sm_90"
+    # - "--U__cpp_impl_trivially_relocatable"
+  Remove:
+    - "-forward-unknown-to-host-compiler"
+    - "--expt-extended-lambda"
+    - "--expt-relaxed-constexpr"
+    - "--use_fast_math"
+    - "--ptxas-options=*"
+    - "--generate-line-info"
+    - "-Wno-subobject-linkage"
+
+Diagnostics:
+  Suppress:
+    - "unknown_cuda_version"
+    - "err_drv_no_cuda_libdevice"
