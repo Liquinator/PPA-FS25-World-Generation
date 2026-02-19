@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 
+#include "parlay/internal/get_time.h"
 #include "perlin_noise_cpu.hpp"
 #include "perlin_noise_cuda.hpp"
 #include "perlin_noise_hybrid.hpp"
@@ -19,6 +20,7 @@ class MapGenerator {
 public:
   HeightMap generate_heightmap_seq(const PerlinNoise &noise,
                                    const HeightmapConfig &config) {
+    parlay::internal::timer t(std::string("sequential"));
     HeightMap heightmap(config.width, config.height);
     for (int x = 0; x < config.width; x++) {
       for (int y = 0; y < config.height; y++) {
@@ -27,12 +29,16 @@ public:
         heightmap.at(x, y) = noise.octaveNoise(nx, ny, config.octaves);
       }
     }
+    t.next("generation");
     normalize(heightmap);
+    t.next("normalization");
+    t.total();
     return heightmap;
   }
 
   HeightMap generate_heightmap_par(const PerlinNoise &noise,
                                    const HeightmapConfig &config) {
+    parlay::internal::timer t(std::string("parallel"));
     HeightMap heightmap(config.width, config.height);
     parlay::parallel_for(0, config.width * config.height, [&](size_t i) {
       int x = i % config.width;
@@ -43,7 +49,10 @@ public:
 
       heightmap.data[i] = noise.octaveNoise(nx, ny, config.octaves);
     });
+    t.next("generation");
     normalize(heightmap);
+    t.next("normalization");
+    t.total();
     return heightmap;
   }
 

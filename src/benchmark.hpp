@@ -55,21 +55,9 @@ template <typename F>
 inline HeightMap benchmark_heightmap(const std::string& label, F&& generate) {
   std::cout << "Starting " << label << " heightmap generation benchmark"
             << std::endl;
-  std::vector<std::chrono::duration<double>> times;
-
   for (int r = 0; r < BENCHMARK_QUANTITY; ++r) {
-    auto start = std::chrono::high_resolution_clock::now();
     generate();
-
-    auto stop = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> diff = stop - start;
-    std::cout << "Time " << diff.count() << std::endl;
-    times.push_back(diff);
   }
-
-  std::chrono::duration<double> total_time = std::accumulate(
-      times.begin(), times.end(), std::chrono::duration<double>(0.0));
-  std::cout << "average " << (total_time / times.size()).count() << std::endl;
   return generate();
 }
 

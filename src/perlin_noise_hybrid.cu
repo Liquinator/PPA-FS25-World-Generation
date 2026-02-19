@@ -6,6 +6,7 @@
 #include <parlay/sequence.h>
 #include <random>
 
+#include "parlay/internal/get_time.h"
 #include "perlin_common.cuh"
 #include "perlin_noise_cpu.hpp"
 #include "perlin_noise_hybrid.hpp"
@@ -77,7 +78,10 @@ void PerlinNoiseHybrid::generate_heightmap(int32_t octaves, float frequency,
 
 parlay::sequence<float> PerlinNoiseHybrid::generate_normalized_heightmap(
     int32_t octaves, float frequency, glm::vec2 dim) {
+  parlay::internal::timer t(std::string("hybrid"));
   generate_heightmap(octaves, frequency, dim);
+  t.next("generation (gpu+cpu concurrent)");
+
   size_t norm_split_point = impl->norm_split_point_percent * world_size;
   auto gpu_part = heightmap.cut(0, norm_split_point);
   auto cpu_part = heightmap.cut(norm_split_point, world_size);
@@ -88,6 +92,7 @@ parlay::sequence<float> PerlinNoiseHybrid::generate_normalized_heightmap(
 
   float gpu_min_val = *cuda_minmax.first;
   float gpu_max_val = *cuda_minmax.second;
+  t.next("minmax");
 
   float range = gpu_max_val - gpu_min_val;
 
@@ -104,6 +109,8 @@ parlay::sequence<float> PerlinNoiseHybrid::generate_normalized_heightmap(
         });
       });
   cudaStreamSynchronize(impl->gpu_stream);
+  t.next("normalization (gpu+cpu concurrent)");
+  t.total();
 
   return std::move(heightmap);
 }

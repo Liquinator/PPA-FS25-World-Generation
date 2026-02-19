@@ -9,6 +9,7 @@
 #include <parlay/sequence.h>
 #include <random>
 
+#include "parlay/internal/get_time.h"
 #include "perlin_common.cuh"
 #include "perlin_noise_cuda.hpp"
 
@@ -54,18 +55,25 @@ PerlinNoiseCuda::~PerlinNoiseCuda() = default;
 
 parlay::sequence<float> PerlinNoiseCuda::generate_normalized_heightmap(
     int32_t octaves, float frequency, glm::vec2 dim) const {
+  parlay::internal::timer t(std::string("cuda"));
   thrust::device_vector<float> device_results =
       generate_heightmap(impl->device_permutation, octaves, frequency, dim);
+  t.next("generation");
+
   auto result =
       thrust::minmax_element(device_results.begin(), device_results.end());
-
   float min_val = *result.first;
   float max_val = *result.second;
+  t.next("minmax");
 
   thrust::transform(device_results.begin(), device_results.end(),
                     device_results.begin(), NormalizeFunctor(min_val, max_val));
+  t.next("normalization");
+
   parlay::sequence<float> heightmap(device_results.size());
   thrust::copy(device_results.begin(), device_results.end(), heightmap.begin());
+  t.next("device_to_host_copy");
+  t.total();
 
   return heightmap;
 }
