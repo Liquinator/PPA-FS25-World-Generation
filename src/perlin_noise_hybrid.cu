@@ -51,6 +51,7 @@ void PerlinNoiseHybrid::generate_heightmap(int32_t octaves, float frequency,
   world_size = (size_t)(dim.x * dim.y);
   size_t gen_split_point = impl->gen_split_point_percent * world_size;
 
+  // ? Unitialized cooks the perf
   heightmap = parlay::sequence<float>(world_size);
   auto gpu_part = heightmap.cut(0, gen_split_point);
   auto cpu_part = heightmap.cut(gen_split_point, world_size);

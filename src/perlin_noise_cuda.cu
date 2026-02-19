@@ -35,11 +35,13 @@ PerlinNoiseCuda::PerlinNoiseCuda(unsigned int seed)
 
 PerlinNoiseCuda::~PerlinNoiseCuda() = default;
 
-parlay::sequence<float> PerlinNoiseCuda::generate_normalized_heightmap(
-    int32_t octaves, float frequency, glm::vec2 dim) const {
+parlay::sequence<float>
+PerlinNoiseCuda::generate_normalized_heightmap(int32_t octaves, float frequency,
+                                               glm::vec2 dim) const {
   parlay::internal::timer t(std::string("cuda"));
   size_t world_size = (size_t)(dim.x * dim.y);
-  parlay::sequence<float> heightmap(world_size);
+  // ? Unitialized cooks the perf
+  auto heightmap = parlay::sequence<float>(world_size);
 
   float freq_x = (float)(frequency / dim.x);
   float freq_y = (float)(frequency / dim.y);
