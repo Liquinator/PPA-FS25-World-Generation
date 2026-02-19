@@ -30,6 +30,7 @@ target_compile_options(benchmark_world_gen
         $<$<COMPILE_LANGUAGE:CXX>:
             -march=native
             -O3
+            -ffast-math
             -pthread
             -Wno-subobject-linkage
             -Wno-overflow
